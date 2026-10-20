@@ -45,6 +45,12 @@ test('release manifests drop development routing without modifying source',()=>{
   assert.equal(source.quickDev,true);
   assert.equal(marketPayload(source,'owner/repo','v1.2.0','1.2.0').devUrl,undefined);
 });
+test('release manifests disable native hot reload but keep enablement',()=>{
+  const source={packid:'plugin-a',version:'1.0.0',entry:'dist/index.html',native:{enabled:true,autoReload:true}};
+  const released=productionManifest(source,'1.2.0');
+  assert.deepEqual(released.native,{enabled:true,autoReload:false});
+  assert.equal(source.native.autoReload,true);
+});
 test('dry-run planning cannot authorize release or market writes',()=>{
   assert.deepEqual(releasePlan({EVENT_NAME:'workflow_dispatch',DRY_RUN:'true',PUBLISH_MARKET:'true'}),
     {publish_enabled:false,market_requested:true,market_enabled:false,validate_release:true});

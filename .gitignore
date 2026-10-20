@@ -22,3 +22,10 @@ Thumbs.db
 # ---- 上游源码 ----
 # 已迁到 upstream.pin + 按需拉取，不再随仓库分发
 /upstream/
+
+# ---- native 适配层的构建产物 ----
+# 由发布流水线产物按宿主约定命名为 lib/{macOS.dylib,Windows.dll,Linux.so}，不进 git。
+native/target/
+*.dylib
+*.dll
+*.so

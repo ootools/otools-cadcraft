@@ -139,6 +139,13 @@ function main() {
   if (!entryData.includes('cadcraftOtools')) fail('入口 HTML 里没有 OTools 桥（window.cadcraftOtools）');
   ok('入口 HTML 含 OTools 宿主桥');
 
+  if (manifest.native?.enabled === true || manifest.mcp?.backend === 'headless') {
+    for (const name of ['lib/macOS.dylib', 'lib/Windows.dll', 'lib/Linux.so']) {
+      if (!names.includes(name)) fail(`声明了 native MCP，但包内缺少 ${name}`);
+    }
+    ok('三平台 native MCP 产物都在包内');
+  }
+
   const wasm = entries.filter((e) => e.name.endsWith('.wasm'));
   if (wasm.length === 0) fail('包内没有 .wasm');
   ok(`wasm 产物：${wasm.map((e) => `${e.name} ${(e.data.length / 1048576).toFixed(1)}MB`).join(', ')}`);

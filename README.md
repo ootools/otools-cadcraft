@@ -22,10 +22,12 @@ otools-cadcraft/
 │   ├── index.html            #   入口 + window.cadcraftOtools 这段 JS 桥
 │   ├── Trunk.toml            #   dist 指向仓库根的 dist/
 │   └── Cargo.toml            #   path 依赖 ../upstream/crates/*，不复制上游代码
+├── native/                   # 宿主 MCP 网关的 headless 适配层（独立 workspace）
 ├── plugin.json               # OTools 插件清单（entry = dist/index.html）
 ├── scripts/
 │   ├── build-wasm.mjs        #   trunk 构建 → dist/
 │   └── deploy-to-otools.ps1  #   同步到 otools 仓库 plugins/ 目录
+├── lib/                      # 三平台 native 产物（.gitignore，本地/CI 构建）
 └── dist/                     # 构建产物（.gitignore，本地构建）
 ```
 
@@ -44,8 +46,10 @@ JS 侧只有 `shell/index.html` 里那一段（约 120 行）：把 `window.otoo
 `dialog.open/save`、`readHostFile`、`writeHostFile` 包成 `window.cadcraftOtools`，
 `shell/src/otools.rs` 用 wasm-bindgen 直接调它。
 
-**不引入 native cdylib**：宿主已经注入了无路径白名单限制的 `tools_webview_read_file` /
-`tools_webview_write_file` 与文件对话框，再加一层 FFI 只会多一份分发产物。
+**`shell/` 不引入 native cdylib**：宿主已经注入了无路径白名单限制的
+`tools_webview_read_file` / `tools_webview_write_file` 与文件对话框。宿主 MCP 网关需要的是
+另一条能力路径：`native/` 把上游 `cadcraft-mcp` 的 headless 后端编成动态库，经同一套
+`__otools_mcp_tools__` / `__otools_mcp_call__` ABI 对外提供 AI 工具。它不参与 WASM 构建。
 
 ### 宿主探测：双通道 + 诊断面包屑
 
@@ -132,7 +136,7 @@ node scripts/verify-plugin.mjs    # 打包后自检（强烈建议每次都跑�
 
 1. 从 `plugin.json` 生成**生产清单**——删掉 `devUrl` / `quickDev`（正式包不允许带），
    版本号可被第二个参数覆盖（`node scripts/pack-plugin.mjs 0.6.3`）。
-2. 打成扁平结构的 ZIP（`plugin.json` / `logo.svg` / `dist/…`），即 `.oplg`。
+2. 打成扁平结构的 ZIP（`plugin.json` / `logo.svg` / `dist/…` / `lib/…`），即 `.oplg`。
 3. 产出一份可直接整目录托管的发布目录：`plugin.json`、`logo.svg`、`SHA256SUMS`、`meta.json`。
 
 `verify-plugin.mjs` 不依赖第三方库（自带最小 ZIP 读取器），校验清单合法性、
@@ -140,8 +144,9 @@ SHA256SUMS 覆盖与匹配、无 `devUrl`/`quickDev`、ZIP 条目无重复/无�
 逐条 CRC 与解压大小、`entry` 与 `logo.svg` 在包内、入口 HTML 含 OTools 宿主桥、包内有 `.wasm`。
 
 **本地安装**：OTools 插件市场 → 安装本地插件 → 选 `.oplg`（`.zip` 也行），
-或把 `dist-pack/` 下那份扁平目录整个丢进宿主插件目录。安装后即插即用，无需额外依赖
-（插件是纯前端，不注册 native dylib）。
+或把 `dist-pack/` 下那份扁平目录整个丢进宿主插件目录。正式包需要同时含
+`lib/{macOS.dylib,Windows.dll,Linux.so}`；本地只改前端、未构建 native 时仍可打包联调，
+但发布前 `verify-plugin.mjs` 会要求三平台产物齐全。
 
 ## 发布插件（独立发布，不走 otools-publish）
 
@@ -157,7 +162,7 @@ gh workflow run release-plugin.yml --ref main -R ootools/otools-cadcraft \
 | 环节 | 做法 |
 | --- | --- |
 | 触发 | `workflow_dispatch`（手动，四个开关见上）或 push tag `v*`（自动） |
-| 构建 | ubuntu-latest：`node --test scripts/*.test.mjs` → rust stable + wasm32 + trunk v0.21.14（预编译二进制）→ `node scripts/build-wasm.mjs` |
+| 构建 | `build-native`：四个平台 runner 编译并测试 native，两份 macOS 由 `merge-native` lipo 成 universal；`build`：`node --test scripts/*.test.mjs` → rust stable + wasm32 + trunk v0.21.14（预编译二进制）→ `node scripts/build-wasm.mjs` |
 | 打包校验 | `pack-plugin.mjs --out dist-pack --version <v>` → `verify-plugin.mjs dist-pack`（发布前在 publish job 里再校验一次） |
 | Release | tag `plugin-otools-cadcraft-v<v>`，资产 `.oplg` + `logo.svg` + `plugin.json` + `SHA256SUMS` |
 | 市场 | `publish-market.mjs`（pat/oidc/login/shared 四种认证）POST 生产清单 + `packageUrl` + `logo` 到市场 API |

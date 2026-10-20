@@ -1,9 +1,12 @@
 # 构建 CADCraft 的 OTools 插件前端（WASM → dist/）并上传产物。
 # 触发：push 到 main、PR、手动。
 #
-# 本 workflow 只构建**前端**。插件是纯前端的（没有 native cdylib），
-# 所以产物就是 dist/ 这一份静态资源，拷到 otools 仓库的
-# plugins/otools-cadcraft/dist 即可用。
+# 两个 job：
+# - wasm：构建前端产物 dist/（拷到 otools 仓库的 plugins/otools-cadcraft/dist 即可用）。
+# - native：编译 native 适配层（上游 cadcraft-mcp 的 headless 后端），
+#   只做「能不能编过 + 单测过」的 PR 门禁；正式多平台产物由 release-plugin.yml 出。
+#
+# 上游源码不在 git 里：scripts/build-wasm.mjs 会先按 upstream.pin 拉取，再跑 trunk。
 name: build-plugin
 
 on:
@@ -49,3 +52,24 @@ jobs:
           name: otools-cadcraft-dist
           path: dist/
           if-no-files-found: error
+
+  # native 适配层在 PR 阶段就跑一次，避免「上游同步后 native 编不过」直到发版才发现。
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 拉取上游源码
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        run: node scripts/fetch-upstream.mjs
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            native -> native/target
+          key: plugin-native-ci
+      - name: 编译并测试 native 适配层
+        run: cargo test --release --manifest-path native/Cargo.toml

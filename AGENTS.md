@@ -1,7 +1,7 @@
 # AGENTS.md —— otools-cadcraft 移植约定
 
 给后续接手这个仓库的 agent（和人）的规则。核心一句话：**`upstream/` 一行都不要改**，
-所有移植代码都放在 `shell/`，这样 `git subtree pull` 永远干净。
+所有移植代码都放在 `shell/`（前端）与 `native/`（宿主 MCP 网关的 headless 适配层），这样上游同步永远干净。
 
 ## 铁律
 
@@ -13,9 +13,11 @@
    缺一处就会在脏树重拉后静默丢补丁，报错表现为「上游没有 xx 符号」的隔层错误）。
 2. **`shell/src/upload.rs`、`shell/src/download.rs` 是上游原样副本**，不要就地改；
    要改行为就改 `shell/src/otools.rs` 或 `shell/src/main.rs`。
-3. **不引入 native cdylib**。OTools 宿主已经注入了
+3. **`shell/` 不引入 native cdylib**。OTools 宿主已经注入了
    `tools_webview_read_file` / `tools_webview_write_file` / `tools_webview_list_fonts` /
-   文件对话框，够用；再加 FFI 只是多一份 `lib/Windows.dll` 要跟着分发与签名。
+   文件对话框，够用。
+   **例外（已确立）**：`native/` 是为宿主 MCP 网关暴露 headless 能力的独立适配层，
+   它不是前端外壳的替代，也不参与 WASM 构建。
 4. **改 `shell/Cargo.toml` 的上游依赖版本时，对齐 `upstream/Cargo.toml` 的
    `[workspace.dependencies]`**（egui/eframe 等是 `0.36` 这一档）。
 
@@ -43,6 +45,7 @@
 | `shell/src/upload.rs` | 上游副本：`Inbox`，把读到的字节在下一帧喂给 `CadApp` |
 | `shell/src/download.rs` | 上游副本：非 OTools 环境下退回浏览器下载 |
 | `shell/patches/*.patch` | 对上游的本地裁剪（discord 移除 / 系统字体桥），fetch-upstream 幂等重放 |
+| `native/` | 宿主 MCP 网关的 headless 适配层（独立 workspace，见下节）。产物 `lib/{macOS.dylib,Windows.dll,Linux.so}` 不进 git |
 
 ## 上游管理：pin + 按需拉取（2026-10-15 从 subtree 迁移）
 
@@ -54,6 +57,28 @@
 - **为什么改**：subtree 会把约 10MB 的快照永久塞进仓库，而且每次同步只增不减。
   迁移时保留了原来 subtree 锁定的 commit（`e707ab4…`），行为与迁移前一致；
   历史里那些 blob 仍在（清掉需要 force-push，别擅自做）。
+
+## native 适配层（宿主 MCP 网关）
+
+`native/` 是把上游现成的 headless 后端（`cadcraft-mcp`）编成动态库的薄胶水，
+让外部 AI 工具经宿主的大 MCP 端点操作本插件。它不是前端外壳，**不参与 WASM 构建**，
+也与 `shell/` 互不依赖。
+
+- **独立 workspace**（`native/Cargo.toml` 里有 `[workspace]`）：并进上游 workspace 会让
+  构建把 UI 依赖（eframe/wgpu）也拉进来。
+- **上游源码不在 git 里**：`native/` 用 path 依赖直接吃 `../upstream/crates/*`，
+  所以构建前必须先 `node scripts/fetch-upstream.mjs`。
+- **通过公开 `Server` 适配**：上游的 `tools` 模块是私有的。`native/src/mcp.rs` 用
+  专用线程持有唯一 `Server`，经 `handle_line` 复用上游的工具表、schema 校验和调用逻辑；
+  会话必须跨调用持久（`native/src/mcp.rs` 的 `session_state_persists_across_calls` 用例守着）。
+- **I/O hook 必须装**：`open` / `save` 依赖上游 `cmd::file::set_io` 等 hook，装配方式与
+  上游 CLI/桌面端一致。
+- **两个宿主 method**（宿主 spec §5.4 冻结的契约）：
+  `__otools_mcp_tools__` / `__otools_mcp_call__`。
+- **产物命名是宿主约定**：`lib/macOS.dylib` / `lib/Windows.dll` / `lib/Linux.so`，
+  由 `scripts/pack-plugin.mjs` 打进 `.oplg`；二进制**不进 git**。
+- **构建/测试**：`cargo test --release --manifest-path native/Cargo.toml`。
+  多平台产物由 `.github/workflows/release-plugin.yml` 的 `build-native` / `merge-native` 两个 job 出。
 
 ## 常见任务
 - **要加一个新的宿主能力**（例如把 DWG 另存 PDF 走宿主）→ 在 `shell/index.html`

@@ -1,0 +1,38 @@
+# CADCraft 的 OTools 插件 native 适配层。
+#
+# 上游 `crates/mcp` 已经提供进程内 headless 会话和完整的 JSON-RPC 分发，
+# 但它的 `tools` 模块是私有的，只公开了 `Headless` / `Server`。
+# 本 crate 因此通过 `Server::handle_line` 复用上游工具表、schema 校验和调用逻辑，
+# 不复制任何工具实现。
+#
+# 独立 workspace：上游 workspace 面向 GUI / wasm，并进来会把 UI 依赖带进插件构建。
+[package]
+name = "otools-cadcraft-native"
+description = "CADCraft as an OTools plugin: persistent headless MCP backend over the upstream cadcraft-mcp crate"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "otools_cadcraft_native"
+
+[dependencies]
+cadcraft-engine = { path = "../upstream/crates/engine" }
+cadcraft-io = { path = "../upstream/crates/io" }
+cadcraft-mcp = { path = "../upstream/crates/mcp" }
+serde_json = "1"
+
+# 上游 workspace 的 patch 不会跟着 path 依赖传播，当前 cadcraft 没有
+# `[patch.crates-io]`；上游新增补丁时必须同步到这里（见 AGENTS.md）。
+
+# cdylib 必须可 unwind：插件 FFI 边界在插件内部捕获 panic，
+# 若 release profile 设成 abort，宿主会整体被杀。
+[profile.release]
+panic = "unwind"
+opt-level = 3
+lto = "thin"
+codegen-units = 16

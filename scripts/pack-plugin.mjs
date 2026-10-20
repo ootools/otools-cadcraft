@@ -7,10 +7,13 @@
  * 扁平结构（plugin.json 在 ZIP 根）与「单一顶层目录」两种布局宿主都认，
  * 这里用扁平。
  *
- * 本插件是**纯前端**插件（没有 native cdylib），所以：
- *   - 不校验 lib/；
- *   - 用 `productionManifest` 去掉开发期配置（devUrl / quickDev），
- *     否则 OTools 的正式包校验会以「正式包不能启用开发模式」拒收。
+ * 本插件含 native 适配层（cadcraft headless MCP）。`lib/` 若存在则一并打进包，
+ * 命名须符合宿主约定：lib/{macOS.dylib,Windows.dll,Linux.so}
+ * （宿主 native_plugins/core.rs 的 platform_lib_name()）。本地没构建 native 时
+ * `lib/` 不存在也不报错，方便只改前端时的联调。
+ *
+ * 用 `productionManifest` 去掉开发期配置（devUrl / quickDev），
+ * 否则 OTools 的正式包校验会以「正式包不能启用开发模式」拒收。
  *
  * 用法：node scripts/pack-plugin.mjs [--out dist-pack] [--version 0.6.2]
  */
@@ -121,7 +124,7 @@ export function productionManifest(manifest, version = '') {
   const result = { ...manifest, version: next };
   delete result.devUrl;
   delete result.quickDev;
-  // 本插件没有 native；若将来加了，autoReload 是开发期热重载开关，同样要关掉。
+  // native 的 autoReload 是开发期热重载开关，正式包必须关掉。
   if (result.native && typeof result.native === 'object') {
     result.native = { ...result.native, autoReload: false };
   }
@@ -145,7 +148,7 @@ function main() {
     if (fs.existsSync(full)) entries.push({ name: logo, data: fs.readFileSync(full) });
   }
 
-  // 3) 前端产物 dist/（本插件没有 lib/：纯前端，无 native cdylib）
+  // 3) 前端产物 dist/ 与 native 产物 lib/
   for (const name of ['dist', 'lib']) {
     const dir = path.join(root, name);
     if (!fs.existsSync(dir)) continue;
@@ -179,7 +182,7 @@ function main() {
     output,
     entries: entries.length,
     totalBytes: entries.reduce((sum, item) => sum + item.data.length, 0),
-    nativeLibs: [],
+    nativeLibs: fs.existsSync(path.join(root, 'lib')) ? walk(path.join(root, 'lib')).map((relative) => `lib/${relative}`) : [],
   };
   fs.writeFileSync(path.join(outDir, 'meta.json'), `${JSON.stringify(meta, null, 2)}\n`, 'utf8');
   process.stdout.write(`${JSON.stringify(meta)}\n`);
