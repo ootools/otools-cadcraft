@@ -541,14 +541,14 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "cadcraft-color"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "cadcraft-constraints"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "cadcraft-doc",
  "cadcraft-geom",
@@ -558,7 +558,7 @@ dependencies = [
 
 [[package]]
 name = "cadcraft-doc"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "cadcraft-color",
  "cadcraft-geom",
@@ -569,14 +569,14 @@ dependencies = [
 
 [[package]]
 name = "cadcraft-dwg"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "acadrust",
 ]
 
 [[package]]
 name = "cadcraft-dxf"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "encoding_rs",
  "log",
@@ -585,7 +585,7 @@ dependencies = [
 
 [[package]]
 name = "cadcraft-engine"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "cadcraft-color",
  "cadcraft-constraints",
@@ -594,6 +594,7 @@ dependencies = [
  "cadcraft-fonts",
  "cadcraft-geom",
  "cadcraft-render",
+ "craft-docpath",
  "log",
  "rstar",
  "serde",
@@ -603,7 +604,7 @@ dependencies = [
 
 [[package]]
 name = "cadcraft-fonts"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "cadcraft-geom",
  "harfrust",
@@ -613,14 +614,14 @@ dependencies = [
 
 [[package]]
 name = "cadcraft-geom"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "cadcraft-io"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "cadcraft-color",
  "cadcraft-doc",
@@ -638,7 +639,7 @@ dependencies = [
 
 [[package]]
 name = "cadcraft-render"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "cadcraft-color",
  "cadcraft-doc",
@@ -651,7 +652,7 @@ dependencies = [
 
 [[package]]
 name = "cadcraft-ui-egui"
-version = "0.6.2"
+version = "0.8.0"
 dependencies = [
  "cadcraft-color",
  "cadcraft-doc",
@@ -836,6 +837,11 @@ name = "core_detect"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f8f80099a98041a3d1622845c271458a2d73e688351bf3cb999266764b81d48"
+
+[[package]]
+name = "craft-docpath"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=82a24b006eefa036b43c09a67fb9a3fbd17ffe63#82a24b006eefa036b43c09a67fb9a3fbd17ffe63"
 
 [[package]]
 name = "craft-ui"
