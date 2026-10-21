@@ -13,7 +13,8 @@ OTools 宿主上，就得到了一个插件。上游 `crates/*` 一行没改。
 
 ```
 otools-cadcraft/
-├── upstream/                 # 上游 storytold/cadcraft 的 git subtree（原样，勿改）
+├── upstream.pin              # 上游锁定（storytold/cadcraft 的完整 SHA，唯一真源）
+├── upstream/                 # 按 pin 浅拉的上游代码 + 重放补丁后的工作区（不入库）
 ├── shell/                    # 我们唯一新写的 Rust 代码：OTools 外壳
 │   ├── src/main.rs           #   改编自上游 apps/cadcraft-web/src/main.rs
 │   ├── src/otools.rs         #   OTools 宿主桥（对话框 + 读写文件）
@@ -21,10 +22,12 @@ otools-cadcraft/
 │   ├── src/download.rs       #   上游原样副本（非 OTools 环境下的浏览器下载回退）
 │   ├── index.html            #   入口 + window.cadcraftOtools 这段 JS 桥
 │   ├── Trunk.toml            #   dist 指向仓库根的 dist/
+│   ├── patches/              #   对上游的本地裁剪（重拉不丢），见「跟进上游」
 │   └── Cargo.toml            #   path 依赖 ../upstream/crates/*，不复制上游代码
 ├── native/                   # 宿主 MCP 网关的 headless 适配层（独立 workspace）
 ├── plugin.json               # OTools 插件清单（entry = dist/index.html）
 ├── scripts/
+│   ├── fetch-upstream.mjs    # 按 pin 拉上游源码 + 幂等重放 shell/patches
 │   ├── build-wasm.mjs        #   trunk 构建 → dist/
 │   └── deploy-to-otools.ps1  #   同步到 otools 仓库 plugins/ 目录
 ├── lib/                      # 三平台 native 产物（.gitignore，本地/CI 构建）
@@ -88,6 +91,7 @@ noder runtime.js，共约 130KB），实测个别 webview 里**后半段可能�
 
 | 插件版本 | 上游标签 | 上游提交 | 打包日期 |
 | --- | --- | --- | --- |
+| 0.7.0 | v0.8.0 | `714111d528acc86dc6b41e03f9a82cabc1066dca` | 2026-10-21 |
 | 0.6.9 | v0.8.0 | `714111d528acc86dc6b41e03f9a82cabc1066dca` | 2026-10-21 |
 | 0.6.8 | — | `e707ab4d7cc10102e550ad4c5bcecef1084a9baa` | — |
 
@@ -122,18 +126,49 @@ URL 参数沿用上游：`?webgl` 强制 WebGL2、`?cpu` 用 egui 形状画布�
 
 ## 跟进上游
 
-上游以 **git subtree** 挂在 `upstream/`：
+上游代码**不入库随仓库分发**，靠 `upstream.pin`（完整 SHA）+ `scripts/fetch-upstream.mjs`
+按需浅拉，再把 `shell/patches/*.patch` 幂等重放到 `upstream/` 上：
 
 ```bash
-git subtree pull --prefix=upstream https://github.com/storytold/cadcraft.git main --squash
+node scripts/fetch-upstream.mjs              # 对齐 pinned commit 后自动重放补丁
+node scripts/fetch-upstream.mjs --check      # 只校验是否已对齐，不下载
 ```
 
-因为上游目录保持原样，这条命令不会产生冲突。之后要做的事只有两件：
+要对齐新上游就改 `upstream.pin` 里的 `commit`（完整 SHA，认「发布标签」而不是 main HEAD），
+再跑一次上面的命令；之后要做的事只有两件：
 
 1. `upstream/apps/cadcraft-web/src/{main,upload,download}.rs` 有没有变？变了就把改动
    合并进 `shell/src/` 同名文件（差异就是上面那张表的三处）。
 2. `shell/Cargo.toml` 里上游 crate 的版本号（现在写死 `0.36` 等）跟着 `upstream/Cargo.toml`
    的 `[workspace.dependencies]` 走。
+
+补丁冲突的解法：先 `git fetch --depth 1 origin <旧 pin SHA>` 让 3way 有 blob，再在
+`upstream/` 里手工合并，最后 `git -C upstream diff HEAD -- <文件>` 重新生成补丁并跑一次
+`fetch-upstream.mjs` 验证可重放。注意 `git apply --3way` 会暂存结果，`git diff`（worktree vs
+index）会显示为空，重生成补丁必须用 `git diff HEAD`。
+
+当前三个补丁：
+
+| 补丁 | 作用 |
+| --- | --- |
+| `cadcraft-discord.patch` | 移除 Discord 社区按钮 |
+| `cadcraft-sysfonts.patch` | 接入宿主系统字体目录 |
+| `cadcraft-zh-commandline.patch` | 补简体中文缺口：11 条命令行提示、`ByBlock/ByLayer/ByColor`、ViewCube 罗盘 `N/S/E/W` |
+
+### 界面语言
+
+上游自带 15 种语言词表（`upstream/crates/ui-egui/src/i18n/*.tsv`，三列：
+`context <TAB> source <TAB> translation`），简体中文是 `zh.tsv`，命令行提示、属性值这些
+显示点都走 `i18n::t()`，所以补词表即可生效，不用改代码。
+
+上游 `zh.tsv` 漏译的条目由 `cadcraft-zh-commandline.patch` 补齐（`Select an object to change or`
+这类命令行提示、`随块/随层/随色`、罗盘 `北/南/东/西`）。补丁只改 `zh.tsv` 一个文件，
+不碰其他语言，因此不受上游「各语言行数一致」类约束影响（cadcraft 的
+`i18n/tests.rs` 只强制 `uk` 全覆盖，其他语言缺口仅报告不阻断）。
+刻意**保留原文**的条目：`WCS ⌄`、`DWG`/`DXF`、`+LOC`/`−LOC`/`ΔLOC`/`+Bin`/`−Bin`
+（缩写与格式名按仓库约定不译），以及只含占位符的 `{name}: {distance} < {angle}°` 等模板。
+`Ltscale` 在上游词表里但没有任何 `t()` 调用点（MATCHPROP 的 echo 走
+`format!("…")` 直出、不过翻译），属于死键，未译。
 
 ## 打包本地安装包（.oplg）
 
