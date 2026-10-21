@@ -241,4 +241,12 @@ gh workflow run release-plugin.yml --ref main -R ootools/otools-cadcraft \
 ## 许可
 
 上游为 MIT OR Apache-2.0。本仓库的移植层（`shell/`、`plugin.json`、`scripts/`）同样以
-MIT OR Apache-2.0 分发；`upstream/` 保留上游的 `LICENSE-MIT` / `LICENSE-APACHE` / `NOTICE`。
+MIT OR Apache-2.0 分发。
+
+`upstream/` 不在版本控制内（按 `upstream.pin` 拉取），因此上游的许可文本**已复制到本仓库
+根目录**：`LICENSE-MIT`、`LICENSE-APACHE`、`NOTICE`、`ATTRIBUTION.md`，与上游保持逐字节
+一致。单独分发本仓库时许可与归属信息完整。
+
+`NOTICE` 里两条需要留意的声明：DWG 读写的 `acadrust` crate 为 **MPL-2.0**（按原样作为
+独立 crate 依赖）；可选 `craft-fonts` 输入嵌入的字体为 **SIL OFL 1.1**。另外 ArtCraft 的
+名称与标识是商标、Autodesk 的 AutoCAD/DWG 亦是商标，本仓库与其无隶属关系。
