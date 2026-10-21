@@ -44,10 +44,20 @@ for (let i = 0; i < ncmds; i += 1) {
   }
   offset += size;
 }
-if ([symtab, dysymtab, linkedit, signature].includes(-1)) {
-  console.error('missing required Mach-O load commands');
+const missing = [
+  ['LC_SYMTAB', symtab],
+  ['LC_DYSYMTAB', dysymtab],
+  ['__LINKEDIT', linkedit],
+]
+  .filter(([, at]) => at === -1)
+  .map(([name]) => name);
+if (missing.length > 0) {
+  console.error(`missing required Mach-O load commands: ${missing.join(', ')}`);
   process.exit(1);
 }
+// LC_CODE_SIGNATURE 是可选的：新版 ld 不再给未签名的 dylib 加临时签名
+// （macos-15-intel runner 上见过），没有签名就没有第二处要挪的偏移。
+const hasSignature = signature !== -1;
 
 const symoff = bytes.readUInt32LE(symtab + 8);
 const nsyms = bytes.readUInt32LE(symtab + 12);
@@ -67,8 +77,8 @@ if (indirectOff >= stroff) {
   console.error('indirect symbol table unexpectedly follows the string pool');
   process.exit(1);
 }
-const sigOff = bytes.readUInt32LE(signature + 8);
-if (sigOff < stroff + strsize) {
+const sigOff = hasSignature ? bytes.readUInt32LE(signature + 8) : -1;
+if (hasSignature && sigOff < stroff + strsize) {
   console.error('code signature overlaps the symbol string pool');
   process.exit(1);
 }
@@ -81,17 +91,20 @@ const withPoolPadding = Buffer.concat([
 ]);
 // The code signature follows the pool. It must also start at an 8-byte
 // boundary, so insert pad bytes immediately before it as well.
-const finalSigOff = sigOff + pad;
-const padded = Buffer.concat([
-  withPoolPadding.subarray(0, finalSigOff),
-  Buffer.alloc(pad),
-  withPoolPadding.subarray(finalSigOff),
-]);
+const finalSigOff = hasSignature ? sigOff + pad : -1;
+const padded = hasSignature
+  ? Buffer.concat([withPoolPadding.subarray(0, finalSigOff), Buffer.alloc(pad), withPoolPadding.subarray(finalSigOff)])
+  : withPoolPadding;
 padded.writeUInt32LE(stroff + pad, symtab + 16);
-padded.writeUInt32LE(finalSigOff + pad, signature + 8);
-// __LINKEDIT grows by both insertions.
+if (hasSignature) padded.writeUInt32LE(finalSigOff + pad, signature + 8);
+// __LINKEDIT grows by the insertions (one before the pool, one before the signature).
+const growth = hasSignature ? pad * 2 : pad;
 const linkeditFileSize = padded.readBigUInt64LE(linkedit + 48);
-padded.writeBigUInt64LE(linkeditFileSize + BigInt(pad * 2), linkedit + 48);
+padded.writeBigUInt64LE(linkeditFileSize + BigInt(growth), linkedit + 48);
 
 fs.writeFileSync(path, padded);
-console.log(`aligned Mach-O string pool: ${stroff} -> ${stroff + pad}; signature: ${sigOff} -> ${finalSigOff + pad}`);
+console.log(
+  hasSignature
+    ? `aligned Mach-O string pool: ${stroff} -> ${stroff + pad}; signature: ${sigOff} -> ${finalSigOff + pad}`
+    : `aligned Mach-O string pool: ${stroff} -> ${stroff + pad}; no code signature to shift`,
+);
