@@ -84,6 +84,27 @@ noder runtime.js，共约 130KB），实测个别 webview 里**后半段可能�
 的落点与模式：`overwrite`/`dialog`）。插件没有 devtools，这是事后唯一能看到页面内部状态
 的渠道；WebView2 的 leveldb 里可以直接翻。
 
+## MCP
+
+插件通过宿主 MCP 网关暴露上游 `cadcraft-mcp` 的 12 个工具和 2 个资源：
+
+| 能力 | 内容 |
+| --- | --- |
+| tools | 12 个（`mcp.expose` 是默认勾选种子） |
+| resources | `cadcraft://drawing`、`cadcraft://commands` |
+| resourceTemplates | 无（上游没有这个方法，适配层答空表） |
+| prompts | 无 |
+
+`native/` 用一个专用线程持有唯一的上游 `Server`，宿主调用经 channel 串行进入，因此
+`draw_shape → drawing.inspect` 这类序列共享同一个 headless Session。资源列举与读取也走
+同一个 worker，URI 与错误码由上游给出。
+
+```bash
+cargo test --release --manifest-path native/Cargo.toml
+cargo build --release --manifest-path native/Cargo.toml
+node scripts/smoke-mcp.mjs ..
+```
+
 ## 上游版本
 
 打包所用的上游提交。`upstream.pin` 是唯一真源，这张表用来回溯「哪个插件版本打的是哪份上游代码」，
@@ -91,6 +112,7 @@ noder runtime.js，共约 130KB），实测个别 webview 里**后半段可能�
 
 | 插件版本 | 上游标签 | 上游提交 | 打包日期 |
 | --- | --- | --- | --- |
+| 0.7.1 | v0.8.0 | `714111d528acc86dc6b41e03f9a82cabc1066dca` | 2026-10-24 |
 | 0.7.0 | v0.8.0 | `714111d528acc86dc6b41e03f9a82cabc1066dca` | 2026-10-21 |
 | 0.6.9 | v0.8.0 | `714111d528acc86dc6b41e03f9a82cabc1066dca` | 2026-10-21 |
 | 0.6.8 | — | `e707ab4d7cc10102e550ad4c5bcecef1084a9baa` | — |

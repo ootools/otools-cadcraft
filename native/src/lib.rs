@@ -21,6 +21,23 @@ fn dispatch(method: &str, payload: &Value) -> Result<Value, String> {
                 .unwrap_or_else(|| json!({}));
             Ok(mcp::call_payload(name, &arguments))
         }
+        // 上游 MCP 的 resources 能力（活动图纸 / 命令目录）。
+        "__otools_mcp_resources__" => mcp::resources_payload(),
+        "__otools_mcp_resource_templates__" => mcp::resource_templates_payload(),
+        "__otools_mcp_read_resource__" => {
+            let uri = payload
+                .get("uri")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            if uri.trim().is_empty() {
+                return Err("missing resource uri".to_string());
+            }
+            mcp::read_resource_payload(uri)
+        }
+        // The upstream has no prompts; answer with an empty table rather than
+        // "Unknown method" so the host does not log an error per registry build.
+        "__otools_mcp_prompts__" => Ok(json!({ "prompts": [] })),
+        "__otools_mcp_get_prompt__" => Err("this plugin provides no prompts".to_string()),
         "__otools_shutdown__" => {
             mcp::shutdown_headless();
             Ok(json!({ "ok": true, "data": "otools-cadcraft-native headless session released" }))

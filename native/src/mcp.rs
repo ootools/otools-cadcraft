@@ -216,6 +216,25 @@ fn error_result(message: &str) -> Value {
     })
 }
 
+/// 上游 `resources/list`。分发在 worker 线程里由上游 `Server` 处理，
+/// 因此 URI、name、description 与上游逐字一致，适配层不做任何复制。
+pub fn resources_payload() -> Result<Value, String> {
+    invoke_worker("resources/list", json!({}))
+}
+
+/// 上游 `resources/templates/list`。
+///
+/// CAD 上游**没有**这个分支（`Server::handle` 会回 method not found），但协议要求
+/// 客户端问到就得答得上。这里直接给空表：CAD 的资源是固定两个 URI，没有模板。
+pub fn resource_templates_payload() -> Result<Value, String> {
+    Ok(json!({ "resourceTemplates": [] }))
+}
+
+/// 上游 `resources/read`。未知 uri 由上游给出 `-32002`，这里转成 `Err`。
+pub fn read_resource_payload(uri: &str) -> Result<Value, String> {
+    invoke_worker("resources/read", json!({ "uri": uri }))
+}
+
 pub fn shutdown_headless() {
     let Ok(sender) = worker().lock() else {
         return;
@@ -304,6 +323,61 @@ mod tests {
         assert!(
             text.contains("Line"),
             "inspect did not see the line: {text}"
+        );
+    }
+
+    // ── resources ──────────────────────────────────────────────────────────
+    //
+    // 分发在 worker 线程的上游 `Server` 里，适配层只转发。这三条锁的是
+    // 「转发真的通」：列举到上游的两个 URI、能读回内容、未知 uri 报错。
+
+    #[test]
+    fn resources_list_matches_upstream() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let value = resources_payload().expect("resources/list");
+        let uris: Vec<&str> = value["resources"]
+            .as_array()
+            .expect("resources array")
+            .iter()
+            .filter_map(|r| r.get("uri").and_then(Value::as_str))
+            .collect();
+        assert_eq!(uris.len(), 2, "got {uris:?}");
+        assert!(uris.contains(&"cadcraft://drawing"), "got {uris:?}");
+        assert!(uris.contains(&"cadcraft://commands"), "got {uris:?}");
+    }
+
+    #[test]
+    fn resource_templates_is_an_empty_table() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // 上游没有 resources/templates/list 分支；适配层答空表而不是报 Unknown method，
+        // 否则宿主会把「没有模板」当成协议错误。
+        let value = resource_templates_payload().expect("resources/templates/list");
+        let items = value
+            .get("resourceTemplates")
+            .and_then(Value::as_array)
+            .expect("resourceTemplates array");
+        assert!(items.is_empty(), "{value}");
+    }
+
+    #[test]
+    fn read_resource_round_trips_and_rejects_unknown_uri() {
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let contents = read_resource_payload("cadcraft://commands")
+            .expect("read commands resource")
+            .get("contents")
+            .and_then(Value::as_array)
+            .cloned()
+            .expect("contents array");
+        let text = contents[0]
+            .get("text")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        assert!(!text.trim().is_empty(), "commands resource came back empty");
+
+        let error = read_resource_payload("cadcraft://nope").expect_err("unknown uri must fail");
+        assert!(
+            error.contains("not found") || error.contains("unknown resource"),
+            "error should say the resource is missing: {error}"
         );
     }
 }
