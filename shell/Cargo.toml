@@ -62,6 +62,14 @@ features = [
   "Window",
 ]
 
+# 上游 workspace 里的 `[patch.crates-io]` **不会**跟着 path 依赖带过来：补丁只在发起构建的
+# 那个 workspace 根节点生效。cadcraft 上游从 v0.13.0 起给 krilla / hayro-syntax / hayro-jbig2
+# 打了 craft-libs 的补丁，这里原样复制；上游更新后要同步。
+[patch.crates-io]
+krilla = { version = "=0.8.2", git = "https://github.com/storytold/craft-libs", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae" }
+hayro-syntax = { git = "https://github.com/storytold/craft-libs", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae" }
+hayro-jbig2 = { git = "https://github.com/storytold/craft-libs", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae" }
+
 [profile.release]
 opt-level = 3
 lto = "thin"

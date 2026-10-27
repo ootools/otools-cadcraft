@@ -26,8 +26,14 @@ cadcraft-io = { path = "../upstream/crates/io" }
 cadcraft-mcp = { path = "../upstream/crates/mcp" }
 serde_json = "1"
 
-# 上游 workspace 的 patch 不会跟着 path 依赖传播，当前 cadcraft 没有
-# `[patch.crates-io]`；上游新增补丁时必须同步到这里（见 AGENTS.md）。
+# 上游 workspace 的 patch 不会跟着 path 依赖传播。cadcraft 上游从 v0.13.0 起给
+# krilla / hayro-syntax / hayro-jbig2 打了 craft-libs 的补丁（缺了 krilla 会在
+# backend 里找不到 CRAFT_UNWIND_POISONING / CRAFT_PRINT_COLOR 等标记）；上游新增
+# 补丁时必须同步到这里（见 AGENTS.md）。
+[patch.crates-io]
+krilla = { version = "=0.8.2", git = "https://github.com/storytold/craft-libs", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae" }
+hayro-syntax = { git = "https://github.com/storytold/craft-libs", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae" }
+hayro-jbig2 = { git = "https://github.com/storytold/craft-libs", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae" }
 
 # cdylib 必须可 unwind：插件 FFI 边界在插件内部捕获 panic，
 # 若 release profile 设成 abort，宿主会整体被杀。
