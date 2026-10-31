@@ -4,6 +4,12 @@
   "displayName": "CADCraft",
   "displayNameCN": "CADCraft",
   "entry": "dist/index.html",
+  "fileAssociations": [
+    { "ext": "dxf", "desc": "DXF 图形", "mime": "image/vnd.dxf" },
+    { "ext": "dwg", "desc": "DWG 图形", "mime": "image/vnd.dwg" },
+    { "ext": "dxb", "desc": "DXB 图形", "mime": "application/octet-stream" },
+    { "ext": "dwt", "desc": "DWT 模板", "mime": "image/vnd.dxf" }
+  ],
   "quickDev": true,
   "hasAd": false,
   "icon": "📐",

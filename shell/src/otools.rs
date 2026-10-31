@@ -42,6 +42,11 @@ extern "C" {
     /// `{name, dataBase64, forcePick}` → `{path}` 或 `null`（用户取消）。
     #[wasm_bindgen(js_namespace = cadcraftOtools, js_name = "saveFile")]
     fn host_save_file(request: JsValue) -> js_sys::Promise;
+
+    /// 宿主投递的「打开方式」：JS 侧已把文件读成字节攒好，这里一次取走。
+    /// 元素形如 `{path, name, dataBase64}`（见 `shell/index.html` 的投递段）。
+    #[wasm_bindgen(js_namespace = cadcraftOtools, js_name = "takeDelivered")]
+    fn take_delivered_raw() -> js_sys::Array;
 }
 
 thread_local! {
@@ -118,6 +123,26 @@ async fn open_files() -> Result<Vec<OpenedFile>, String> {
         out.push((name, path, bytes));
     }
     Ok(out)
+}
+
+/// 取走宿主投递的文件并交给 Inbox：下一帧由 `Shell::logic` 的 `drain` 打开
+/// （与「文件 ▸ 打开」和拖放同一条路，含 256MB 上限校验）。
+///
+/// 方向与 [`deliver`] 相反：宿主在系统里双击已绑定扩展名的图形 → 投递队列 →
+/// 本函数取走 → 上游 `CadApp::open_bytes`。
+pub fn drain_delivered() {
+    let raw = take_delivered_raw();
+    for item in raw.iter() {
+        if !item.is_object() {
+            continue;
+        }
+        let name = field(&item, "name").unwrap_or_else(|| "Drawing.dxf".to_string());
+        let data = field(&item, "dataBase64").unwrap_or_default();
+        match base64_decode(&data) {
+            Some(bytes) => with_inbox(|inbox| inbox.receive(name, bytes)),
+            None => with_inbox(|inbox| inbox.refuse(format!("{name}: 宿主投递的内容不是合法的 base64"))),
+        }
+    }
 }
 
 /// `cmd::file::set_deliver`：把保存出的字节交给宿主写盘。

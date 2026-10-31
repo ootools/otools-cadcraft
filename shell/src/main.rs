@@ -57,6 +57,9 @@ mod web {
                 };
             }
             self.1.take_dropped(ctx);
+            // 宿主投递的「打开方式」：系统里双击已绑定扩展名的图形 → 交给 Inbox，
+            // 紧接的 drain 与「文件 ▸ 打开」、拖放走同一条打开路径。
+            crate::otools::drain_delivered();
             self.1.drain(&mut self.0);
             self.0.system_animations = self.2.as_ref().map(|reduced| !reduced.matches());
             self.0.logic(ctx);
@@ -226,6 +229,11 @@ mod web {
         }) as Box<dyn FnMut()>);
         let _ = window.add_event_listener_with_callback(
             "otools-locale-changed",
+            closure.as_ref().unchecked_ref::<js_sys::Function>(),
+        );
+        // 宿主投递了文件：同一份「置位 + 请求重绘」逻辑，让下一帧的 logic 去取件。
+        let _ = window.add_event_listener_with_callback(
+            "otools-open-files-arrived",
             closure.as_ref().unchecked_ref::<js_sys::Function>(),
         );
         closure.forget();
