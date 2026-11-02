@@ -19,11 +19,11 @@
    **例外（已确立）**：`native/` 是为宿主 MCP 网关暴露 headless 能力的独立适配层，
    它不是前端外壳的替代，也不参与 WASM 构建。
 4. **改 `shell/Cargo.toml` 的上游依赖版本时，对齐 `upstream/Cargo.toml` 的
-   `[workspace.dependencies]`**（egui/eframe 等是 `0.36` 这一档）。
+   `[workspace.dependencies]`**（egui/eframe 等是 `0.37` 这一档，且必须把上游 `[patch.crates-io]` 一起抄进 shell/Cargo.toml）。
 
 ## 上手前必须知道的三件事
 
-- **rustc 版本**：上游 `rust-version = "1.95"`（egui 0.36 用了 1.95 才稳定的
+- **rustc 版本**：上游 `rust-version = "1.95"`（egui 0.37 用了 1.95 才稳定的
   `Vec::push_mut`）。本机 `Program Files/Rust` 的 1.94.1 会在 `epaint` 上直接
   `E0658`；用 rustup 装的 stable（实测 1.99.0）：`unset RUSTC_WRAPPER`（它是
   持久环境变量，指向 sccache/旧 rustc）并把

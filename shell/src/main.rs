@@ -18,6 +18,9 @@ mod fontbridge;
 #[cfg(target_arch = "wasm32")]
 mod otools;
 
+#[cfg(any(target_arch = "wasm32", test))]
+mod panel_layout;
+
 #[cfg(target_arch = "wasm32")]
 mod web {
     use std::cell::{Cell, RefCell};
@@ -56,7 +59,8 @@ mod web {
                     vec![host]
                 };
             }
-            self.1.take_dropped(ctx);
+            // Background reads are consume-based and run on hidden ticks too. Dropped files are
+            // input and are read from `ui` only.
             // 宿主投递的「打开方式」：系统里双击已绑定扩展名的图形 → 交给 Inbox，
             // 紧接的 drain 与「文件 ▸ 打开」、拖放走同一条打开路径。
             crate::otools::drain_delivered();
@@ -68,20 +72,42 @@ mod web {
             // 宿主字体桥：把应用要过的系统字体文件读进来（有界批量，读完请求重绘）。
             crate::fontbridge::poll(ctx);
         }
+        /// Forward raw input to the web `CadApp` and capture Tab at the command line.
         fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
-            self.0.raw_input_hook(raw);
+            self.0.raw_input_hook(ctx, raw);
             cadcraft_ui_egui::cmdline::capture_tab(ctx, raw);
         }
-        /// 偏好（界面主题与语言）跨重载保留；egui 自身状态不保留。
+        /// Preferences and validated panel placement survive reloads; egui memory is not kept.
         fn save(&mut self, storage: &mut dyn eframe::Storage) {
             storage.set_string(cadcraft_ui_egui::options::PROFILE_KEY, self.0.profile_json());
             storage.set_string(cadcraft_ui_egui::PREFS_KEY, self.0.prefs_json());
+            match crate::panel_layout::save(&self.0.ui) {
+                Ok(layout) => storage.set_string(crate::panel_layout::KEY, layout),
+                Err(error) => log::warn!("panel layout was not saved: {error}"),
+            }
         }
         fn persist_egui_memory(&self) -> bool {
             false
         }
+        /// On the first pass consume files dropped on the page, then delegate drawing to `CadApp::ui`.
         fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+            let first_pass = ui.ctx().current_pass_index() == 0;
+            if first_pass {
+                // `take_dropped` consumes the raw list; a second pass or hidden tick cannot
+                // re-read the same file.
+                self.1.take_dropped(ui.ctx());
+            }
             self.0.ui(ui);
+        }
+    }
+
+    /// Writes the browser's document title, which names the tab and is what an embedding page
+    /// (`?host=parent`) reads. eframe's web runner ignores [`egui::ViewportCommand::Title`], so
+    /// the title has to reach the DOM directly.
+    fn set_page_title(title: &str) {
+        match web_sys::window().and_then(|window| window.document()) {
+            Some(document) => document.set_title(title),
+            None => log::warn!("cannot set the page title to {title:?}: there is no document"),
         }
     }
 
@@ -176,7 +202,12 @@ mod web {
                                 }
                             }
                         }
-                        // `?cpu`：不给应用渲染状态，画布用 egui 形状绘制。
+                        if let Some(layout) = cc.storage.and_then(|s| s.get_string(crate::panel_layout::KEY))
+                            && let Err(error) = crate::panel_layout::restore(&mut app.ui, &layout)
+                        {
+                            log::warn!("panel layout was not restored: {error}");
+                        }
+                        // `?cpu`: no render state for the app, so the canvas draws with egui shapes.
                         if !crate::wants_cpu(&query())
                             && let Some(rs) = &cc.wgpu_render_state
                         {

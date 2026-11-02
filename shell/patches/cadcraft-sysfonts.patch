@@ -1,5 +1,5 @@
 diff --git a/crates/fonts/src/lib.rs b/crates/fonts/src/lib.rs
-index 13af056..f77667d 100644
+index 5bbae68..cfbfa6b 100644
 --- a/crates/fonts/src/lib.rs
 +++ b/crates/fonts/src/lib.rs
 @@ -28,6 +28,10 @@ pub use mtext::{MTextColor, MTextLayout, MTextParams, MTextPiece, layout_mtext,
@@ -14,10 +14,10 @@ index 13af056..f77667d 100644
  pub const BUILTIN_FONT: &str = "CADCraft Stroke";
  
 diff --git a/crates/fonts/src/ttf.rs b/crates/fonts/src/ttf.rs
-index 5299890..c47cc19 100644
+index 9c1888a..34255e4 100644
 --- a/crates/fonts/src/ttf.rs
 +++ b/crates/fonts/src/ttf.rs
-@@ -182,6 +182,10 @@ struct Db {
+@@ -181,6 +181,10 @@ struct Db {
      fallback: Fallback,
      /// Bytes of font files loaded from disk so far (bounded by `MAX_LOADED_BYTES`).
      loaded_bytes: usize,
@@ -28,7 +28,7 @@ index 5299890..c47cc19 100644
  }
  
  /// State of the missing-glyph search.
-@@ -205,6 +209,11 @@ enum Source {
+@@ -204,6 +208,11 @@ enum Source {
      File(PathBuf),
      /// A font compiled into the binary ([`crate::CRAFT_FONTS`]), copied on first use.
      Static(&'static [u8]),
@@ -40,7 +40,7 @@ index 5299890..c47cc19 100644
  }
  
  fn lock() -> MutexGuard<'static, Db> {
-@@ -300,6 +309,12 @@ impl Db {
+@@ -299,6 +308,12 @@ impl Db {
          let bytes = Arc::new(match self.paths.get(stem)? {
              Source::File(path) => read_file(path)?,
              Source::Static(bytes) => bytes.to_vec(),
@@ -53,7 +53,7 @@ index 5299890..c47cc19 100644
          });
          self.loaded_bytes = self.loaded_bytes.saturating_add(bytes.len());
          self.files.insert(stem.to_string(), bytes.clone());
-@@ -476,6 +491,102 @@ pub fn register(name: &str, bytes: Vec<u8>) {
+@@ -475,6 +490,102 @@ pub fn register(name: &str, bytes: Vec<u8>) {
      g.fallback = Fallback::default();
  }
  
@@ -157,7 +157,7 @@ index 5299890..c47cc19 100644
  /// the font is first used, the way the embedded craft-fonts fonts are listed.
  #[cfg(test)]
 diff --git a/crates/ui-egui/src/mtext_editor.rs b/crates/ui-egui/src/mtext_editor.rs
-index 3bd54a3..760bf17 100644
+index 5b9813e..b8bab72 100644
 --- a/crates/ui-egui/src/mtext_editor.rs
 +++ b/crates/ui-egui/src/mtext_editor.rs
 @@ -18,6 +18,21 @@ const MIN_PX: f32 = 13.0;
@@ -182,12 +182,12 @@ index 3bd54a3..760bf17 100644
  /// The standard colours (ACI 1..=7) of the colour menu.
  const SWATCHES: [u16; 7] = [1, 2, 3, 4, 5, 6, 7];
  /// Ruler snap, in text heights.
-@@ -195,7 +210,7 @@ fn toolbar(ui: &mut egui::Ui, st: &mut State, base_h: f64) {
-         // Font
-         let shown = cur.font.clone().unwrap_or_else(|| st.fmt.base_font.clone());
-         egui::ComboBox::from_id_salt("mtext_font").width(120.0).selected_text(shown.clone()).show_ui(ui, |ui| {
--            for fam in FAMILIES.iter().map(ToString::to_string).chain(cur.font.clone().filter(|f| !FAMILIES.contains(&f.as_str()))) {
-+            for fam in family_choices(&cur.font) {
-                 if ui.selectable_label(shown == fam, &fam).clicked() {
-                     change(st, |c| c.font = Some(fam.clone()));
-                     refocus = true;
+@@ -235,7 +250,7 @@ fn toolbar(ui: &mut egui::Ui, st: &mut State, base_h: f64) {
+             .width(120.0)
+             .selected_text(shown.clone())
+             .show_ui(ui, |ui| {
+-                for fam in FAMILIES.iter().map(ToString::to_string).chain(cur.font.clone().filter(|f| !FAMILIES.contains(&f.as_str()))) {
++                for fam in family_choices(&cur.font) {
+                     if ui.selectable_label(shown == fam, &fam).clicked() {
+                         change(st, |c| c.font = Some(fam.clone()));
+                         refocus = true;

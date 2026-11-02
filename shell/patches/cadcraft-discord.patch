@@ -1,8 +1,8 @@
 diff --git a/apps/cadcraft/src/native_menu.rs b/apps/cadcraft/src/native_menu.rs
-index 7270435..4dbe014 100644
+index 8649ed8..4420aaa 100644
 --- a/apps/cadcraft/src/native_menu.rs
 +++ b/apps/cadcraft/src/native_menu.rs
-@@ -38,7 +38,6 @@ impl NativeMenu {
+@@ -52,7 +52,6 @@ impl NativeMenu {
          let mut counter = 0usize;
          let app_menu = Submenu::new("CADCraft", true);
          let about = MenuItem::with_id("cc-about", i18n::tr(language, "About CADCraft"), true, None);
@@ -10,7 +10,7 @@ index 7270435..4dbe014 100644
          let predefined = vec![
              ("Services", PredefinedMenuItem::services(Some(i18n::tr(language, "Services")))),
              ("Hide CADCraft", PredefinedMenuItem::hide(Some(i18n::tr(language, "Hide CADCraft")))),
-@@ -48,7 +47,7 @@ impl NativeMenu {
+@@ -62,7 +61,7 @@ impl NativeMenu {
          ];
          // The Mac place for preferences: CADCraft ▸ Settings… (⌘,) opens the Options dialog.
          let settings = MenuItem::with_id("cc-settings", i18n::tr(language, "Settings..."), true, accel("Cmd+Comma"));
@@ -19,7 +19,7 @@ index 7270435..4dbe014 100644
          for (label, item) in &predefined {
              let _ = app_menu.append(item);
              if ["Services", "Show All"].contains(label) {
-@@ -56,7 +55,6 @@ impl NativeMenu {
+@@ -70,7 +69,6 @@ impl NativeMenu {
              }
          }
          items.insert("cc-about".into(), ("ui.dialog.about".into(), "About CADCraft".into(), about));
@@ -27,24 +27,24 @@ index 7270435..4dbe014 100644
          items.insert("cc-settings".into(), ("options".into(), "Settings...".into(), settings));
          let _ = menu.append(&app_menu);
          for (title, entries) in menus::tree(app) {
-@@ -90,11 +88,7 @@ impl NativeMenu {
+@@ -115,11 +113,7 @@ impl NativeMenu {
      pub fn poll(&mut self, app: &mut CadApp, ctx: &egui::Context) {
-         while let Ok(ev) = MenuEvent::receiver().try_recv() {
+         while let Ok(ev) = self.events.try_recv() {
              if let Some((cmd, _, _)) = self.items.get(ev.id.as_ref()) {
 -                if cmd == "ui.discord" {
 -                    ctx.open_url(egui::OpenUrl::new_tab("https://discord.gg/artcraft"));
 -                } else {
--                    menus::activate(app, &cmd.clone());
+-                    menus::activate_native(app, ctx, &cmd.clone());
 -                }
-+                menus::activate(app, &cmd.clone());
++                menus::activate_native(app, ctx, &cmd.clone());
                  ctx.request_repaint();
              }
          }
 diff --git a/crates/ui-egui/src/dialogs.rs b/crates/ui-egui/src/dialogs.rs
-index 914de61..51a1a26 100644
+index acdddb5..7d61826 100644
 --- a/crates/ui-egui/src/dialogs.rs
 +++ b/crates/ui-egui/src/dialogs.rs
-@@ -326,7 +326,6 @@ fn about(ctx: &egui::Context, open: &mut bool) {
+@@ -347,7 +347,6 @@ fn about(ctx: &egui::Context, open: &mut bool) {
                      ui.add_space(6.0);
                      ui.label(RichText::new(crate::tl!("One of the Crafting Apps by the ArtCraft team and community.")).color(t.text_dim));
                      ui.hyperlink_to("getartcraft.com/apps/cadcraft", "https://getartcraft.com/apps/cadcraft");
@@ -53,7 +53,7 @@ index 914de61..51a1a26 100644
                      ui.label(RichText::new(crate::tl!("MIT OR Apache-2.0. Not affiliated with Autodesk, Inc.")).small().color(t.text_faint));
                  }
 diff --git a/crates/ui-egui/src/theme.rs b/crates/ui-egui/src/theme.rs
-index 9064b92..9413288 100644
+index 9aeac31..da6658b 100644
 --- a/crates/ui-egui/src/theme.rs
 +++ b/crates/ui-egui/src/theme.rs
 @@ -10,6 +10,15 @@
@@ -72,7 +72,7 @@ index 9064b92..9413288 100644
  use serde::{Deserialize, Serialize};
  
  /// The interface theme the user chose.
-@@ -384,6 +393,14 @@ pub fn install_fonts(ctx: &egui::Context, language: &str) {
+@@ -396,6 +405,14 @@ pub fn install_fonts(ctx: &egui::Context, language: &str) {
              }
          }
      }
@@ -84,6 +84,6 @@ index 9064b92..9413288 100644
 +            }
 +        }
 +    }
-     ctx.set_fonts(fonts);
- }
- 
+     // `default_fonts` supplies Ubuntu-Light (Proportional) and Hack (Monospace). Hack also
+     // carries the modifier symbols (⇧) that proportional shortcut labels use; keep it as a
+     // bounded late fallback when Ubuntu-Light lacks one. The monochrome emoji face (enabled by

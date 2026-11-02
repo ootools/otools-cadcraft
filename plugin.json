@@ -31,7 +31,7 @@
   "screenshots": [],
   "summary": "CADCraft（开源、纯 Rust 重写的 AutoCAD 式 CAD）的 OTools 插件版：命令行式绘图、对象捕捉、图层、标注、填充、图块，以及 DXF 读写与 DWG 打开。",
   "uuid": "otools-cadcraft",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "native": {
     "enabled": true
   },

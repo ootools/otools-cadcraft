@@ -121,7 +121,7 @@ node scripts/smoke-mcp.mjs ..
 ## 构建
 
 ```bash
-# 1) 工具链（上游要求 rustc >= 1.95：egui 0.36 用了 1.95 才稳定的 Vec::push_mut）
+# 1) 工具链（上游要求 rustc >= 1.95：egui 0.37 用了 1.95 才稳定的 Vec::push_mut）
 rustup toolchain install stable
 rustup target add wasm32-unknown-unknown
 cargo install trunk            # 或从 GitHub releases 下载预编译二进制
@@ -162,7 +162,7 @@ node scripts/fetch-upstream.mjs --check      # 只校验是否已对齐，不下
 
 1. `upstream/apps/cadcraft-web/src/{main,upload,download}.rs` 有没有变？变了就把改动
    合并进 `shell/src/` 同名文件（差异就是上面那张表的三处）。
-2. `shell/Cargo.toml` 里上游 crate 的版本号（现在写死 `0.36` 等）跟着 `upstream/Cargo.toml`
+2. `shell/Cargo.toml` 里上游 crate 的版本号（现在写死 `0.37` 等）跟着 `upstream/Cargo.toml`
    的 `[workspace.dependencies]` 走。
 
 补丁冲突的解法：先 `git fetch --depth 1 origin <旧 pin SHA>` 让 3way 有 blob，再在
