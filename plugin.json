@@ -87,5 +87,6 @@
       "cadcraft://drawing",
       "cadcraft://commands"
     ]
-  }
+  },
+  "openSourceUrl": "https://github.com/ootools/otools-cadcraft"
 }
