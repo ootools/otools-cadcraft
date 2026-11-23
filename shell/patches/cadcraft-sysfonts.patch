@@ -1,8 +1,8 @@
 diff --git a/crates/fonts/src/lib.rs b/crates/fonts/src/lib.rs
-index 5bbae68..cfbfa6b 100644
+index 067293b..9ca79b1 100644
 --- a/crates/fonts/src/lib.rs
 +++ b/crates/fonts/src/lib.rs
-@@ -28,6 +28,10 @@ pub use mtext::{MTextColor, MTextLayout, MTextParams, MTextPiece, layout_mtext,
+@@ -33,6 +33,10 @@ pub use mtext::{MTextColor, MTextLayout, MTextParams, MTextPiece, layout_mtext,
  mod craft_fonts;
  pub use craft_fonts::{CRAFT_FONTS, CraftFont};
  
@@ -14,10 +14,10 @@ index 5bbae68..cfbfa6b 100644
  pub const BUILTIN_FONT: &str = "CADCraft Stroke";
  
 diff --git a/crates/fonts/src/ttf.rs b/crates/fonts/src/ttf.rs
-index 9c1888a..34255e4 100644
+index 951c86e..d7b36ee 100644
 --- a/crates/fonts/src/ttf.rs
 +++ b/crates/fonts/src/ttf.rs
-@@ -181,6 +181,10 @@ struct Db {
+@@ -281,6 +281,10 @@ struct Db {
      fallback: Fallback,
      /// Bytes of font files loaded from disk so far (bounded by `MAX_LOADED_BYTES`).
      loaded_bytes: usize,
@@ -25,10 +25,10 @@ index 9c1888a..34255e4 100644
 +    /// ([`host_bridge::set_system_catalog`]).
 +    #[cfg(target_arch = "wasm32")]
 +    host: Vec<host_bridge::SystemFont>,
- }
- 
- /// State of the missing-glyph search.
-@@ -204,6 +208,11 @@ enum Source {
+     /// Stems of the fonts found in the user's font folders.
+     user: std::collections::HashSet<String>,
+     /// Names read from user font files for lists and family searches, by stem. Reading them
+@@ -318,6 +322,11 @@ enum Source {
      File(PathBuf),
      /// A font compiled into the binary ([`crate::CRAFT_FONTS`]), copied on first use.
      Static(&'static [u8]),
@@ -40,8 +40,20 @@ index 9c1888a..34255e4 100644
  }
  
  fn lock() -> MutexGuard<'static, Db> {
-@@ -299,6 +308,12 @@ impl Db {
-         let bytes = Arc::new(match self.paths.get(stem)? {
+@@ -573,6 +582,11 @@ pub fn installed() -> Vec<FontFile> {
+             let name = match src {
+                 Source::File(p) => p.file_name().map_or_else(|| stem.clone(), |n| n.to_string_lossy().to_string()),
+                 Source::Static(_) => stem.clone(),
++                // The host listed the file by its path: show the file name, as a scan would.
++                #[cfg(target_arch = "wasm32")]
++                Source::Host { path, .. } => {
++                    std::path::Path::new(path).file_name().map_or_else(|| stem.clone(), |n| n.to_string_lossy().to_string())
++                }
+             };
+             (stem.clone(), name, g.user.contains(stem))
+         })
+@@ -639,6 +653,12 @@ impl Db {
+         Some(Arc::new(match self.paths.get(stem)? {
              Source::File(path) => read_file(path)?,
              Source::Static(bytes) => bytes.to_vec(),
 +            #[cfg(target_arch = "wasm32")]
@@ -50,10 +62,10 @@ index 9c1888a..34255e4 100644
 +                host_bridge::push_pending(path.clone(), *index);
 +                return None;
 +            }
-         });
-         self.loaded_bytes = self.loaded_bytes.saturating_add(bytes.len());
-         self.files.insert(stem.to_string(), bytes.clone());
-@@ -475,6 +490,102 @@ pub fn register(name: &str, bytes: Vec<u8>) {
+         }))
+     }
+ 
+@@ -837,6 +857,102 @@ pub fn register(name: &str, bytes: Vec<u8>) {
      g.fallback = Fallback::default();
  }
  
@@ -156,11 +168,21 @@ index 9c1888a..34255e4 100644
  /// Register font bytes that live for the whole process under a name; they are copied only when
  /// the font is first used, the way the embedded craft-fonts fonts are listed.
  #[cfg(test)]
+@@ -893,6 +1009,9 @@ pub fn installed_font_path(stem: &str) -> Option<PathBuf> {
+     match lock().paths.get(&key(stem))? {
+         Source::File(p) => Some(p.clone()),
+         Source::Static(_) => None,
++        // wasm: the file lives with the host, not on any path here.
++        #[cfg(target_arch = "wasm32")]
++        Source::Host { .. } => None,
+     }
+ }
+ 
 diff --git a/crates/ui-egui/src/mtext_editor.rs b/crates/ui-egui/src/mtext_editor.rs
-index 5b9813e..b8bab72 100644
+index a798d67..acb6cab 100644
 --- a/crates/ui-egui/src/mtext_editor.rs
 +++ b/crates/ui-egui/src/mtext_editor.rs
-@@ -18,6 +18,21 @@ const MIN_PX: f32 = 13.0;
+@@ -19,6 +19,21 @@ const MIN_PX: f32 = 13.0;
  const MAX_PX: f32 = 36.0;
  /// Families the font list offers besides the one set in the text.
  const FAMILIES: [&str; 6] = ["Arial", "Times New Roman", "Courier New", "Verdana", "Georgia", "Calibri"];
@@ -182,7 +204,7 @@ index 5b9813e..b8bab72 100644
  /// The standard colours (ACI 1..=7) of the colour menu.
  const SWATCHES: [u16; 7] = [1, 2, 3, 4, 5, 6, 7];
  /// Ruler snap, in text heights.
-@@ -235,7 +250,7 @@ fn toolbar(ui: &mut egui::Ui, st: &mut State, base_h: f64) {
+@@ -255,7 +270,7 @@ fn toolbar(ui: &mut egui::Ui, st: &mut State, base_h: f64) {
              .width(120.0)
              .selected_text(shown.clone())
              .show_ui(ui, |ui| {
