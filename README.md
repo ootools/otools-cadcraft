@@ -273,3 +273,8 @@ MIT OR Apache-2.0 分发。
 `NOTICE` 里两条需要留意的声明：DWG 读写的 `acadrust` crate 为 **MPL-2.0**（按原样作为
 独立 crate 依赖）；可选 `craft-fonts` 输入嵌入的字体为 **SIL OFL 1.1**。另外 ArtCraft 的
 名称与标识是商标、Autodesk 的 AutoCAD/DWG 亦是商标，本仓库与其无隶属关系。
+
+## 当前移植快照（2026-11-25）
+
+当前 `upstream.pin` 固定到 [`0d4b10020999`](https://github.com/storytold/cadcraft/commit/0d4b100209990e485891d85c70ff465c8e709156)。
+本次同步包含上游自 `a70b9b02e4fb` 之后的更新；插件发布版本维持不变，发布时再记录发行版本。

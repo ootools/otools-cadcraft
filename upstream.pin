@@ -3,7 +3,7 @@
   "ssh": "git@github.com:storytold/cadcraft.git",
   "https": "https://github.com/storytold/cadcraft.git",
   "ref": "main",
-  "commit": "a70b9b02e4fb7f2c3b50902d33e8daf96d904053",
+  "commit": "0d4b100209990e485891d85c70ff465c8e709156",
   "strategy": "shallow-fetch-pinned-commit",
   "note": "上游代码不入库。此处保留的是迁移前 git subtree 锁定的那个 commit，行为与迁移前一致；改用 node scripts/fetch-upstream.mjs 按需拉取。要同步上游就把 commit 改成新的完整 SHA 再拉一次。"
 }
